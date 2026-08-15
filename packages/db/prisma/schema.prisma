@@ -1,0 +1,226 @@
+// Data Room — data model.
+//
+// The whole hierarchy lives in a single `Node` table (folders and files) so that
+// every operation that walks the tree — listing, breadcrumbs, subtree stats,
+// access resolution, move, cascade delete — has exactly one implementation.
+//
+// Each node stores a materialized `path`: the slash-delimited ids of its
+// ancestors including itself, e.g. `/<root>/<folder>/<file>/`. That turns
+// "everything under X" into an indexed prefix scan (`path LIKE '<X.path>%'`)
+// instead of a recursive CTE, which is what makes subtree size/count and
+// share-scope checks cheap. See README "How it scales".
+
+// Generated into the package itself rather than node_modules, so that pnpm's
+// isolated store cannot hand two workspaces two different clients.
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum NodeType {
+  FOLDER
+  FILE
+}
+
+enum ShareMode {
+  /// Anyone holding the link can read the shared subtree.
+  PUBLIC_LINK
+  /// Only the users listed in ShareGrant can read the shared subtree.
+  RESTRICTED
+}
+
+enum ShareRole {
+  VIEWER
+  // EDITOR is intentionally absent: the column and the resolver already carry a
+  // role, so adding write access later is a value change, not a remodel.
+}
+
+enum UploadStatus {
+  /// A signed upload URL was issued; the bytes may not be in storage yet.
+  PENDING
+  /// The object was verified in storage and this version is readable.
+  READY
+}
+
+model User {
+  id String @id @default(uuid()) @db.Uuid
+  /// Stored lowercased so sign-in and share grants match regardless of casing.
+  email        String   @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  dataRooms     DataRoom[]
+  createdNodes  Node[]
+  uploads       FileVersion[]
+  createdShares Share[]
+  shareGrants   ShareGrant[]
+
+  @@map("users")
+}
+
+model DataRoom {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  description String?
+  ownerId     String   @db.Uuid
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  /// Every data room owns exactly one root folder node. Sharing a data room is
+  /// therefore just sharing its root node, so shares have a single target type.
+  rootNodeId  String?  @unique @db.Uuid
+  rootNode    Node?    @relation("DataRoomRoot", fields: [rootNodeId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  nodes  Node[]  @relation("DataRoomNodes")
+  shares Share[]
+
+  @@index([ownerId, createdAt])
+  @@map("data_rooms")
+}
+
+model Node {
+  id         String   @id @default(uuid()) @db.Uuid
+  dataRoomId String   @db.Uuid
+  dataRoom   DataRoom @relation("DataRoomNodes", fields: [dataRoomId], references: [id], onDelete: Cascade)
+
+  /// Null only for a data room's root folder.
+  parentId String? @db.Uuid
+  parent   Node?   @relation("NodeChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children Node[]  @relation("NodeChildren")
+
+  type NodeType
+  name String
+  /// `name` lowercased. Uniqueness is enforced on this column so that
+  /// "Report.pdf" and "report.pdf" collide inside one folder, the way users expect.
+  nameKey String
+
+  /// `/<ancestorId>/.../<ownId>/` — see the header comment.
+  path  String
+  depth Int
+
+  /// FILE only: size in bytes of the current version, denormalized so that
+  /// folder totals are a SUM over the prefix scan and never touch file_versions.
+  size BigInt @default(0)
+
+  /// FILE only: how many completed versions exist. Denormalized for the same
+  /// reason as `size` — a listing must not run a subquery per row.
+  versionCount Int @default(0)
+
+  /// FILE only: the version served to readers. Null while the first upload is
+  /// still in flight, which is what keeps half-uploaded files out of listings
+  /// while still reserving their name.
+  currentVersionId String?      @unique @db.Uuid
+  currentVersion   FileVersion? @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+
+  versions FileVersion[] @relation("NodeVersions")
+
+  createdById String @db.Uuid
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  shares       Share[]
+  rootOfDataRoom DataRoom? @relation("DataRoomRoot")
+
+  /// Name conflicts inside a folder are rejected by the database, not by a
+  /// read-then-write check that two concurrent uploads could both pass.
+  @@unique([parentId, nameKey])
+  /// Listing one folder: filter by parent, order folders before files by name.
+  @@index([parentId, type, name])
+  /// Subtree prefix scans (stats, cascade delete, share scope).
+  @@index([dataRoomId, path])
+  /// Search by file name across a data room.
+  @@index([dataRoomId, type, nameKey])
+  @@map("nodes")
+}
+
+model FileVersion {
+  id     String @id @default(uuid()) @db.Uuid
+  nodeId String @db.Uuid
+  node   Node   @relation("NodeVersions", fields: [nodeId], references: [id], onDelete: Cascade)
+
+  /// 1-based, monotonic per node.
+  version Int
+  /// Object key inside the storage bucket. Never derived from the display name,
+  /// so renaming a file is a metadata-only operation.
+  storageKey String       @unique
+  size       BigInt
+  mimeType   String
+  status     UploadStatus @default(PENDING)
+
+  uploadedById String @db.Uuid
+  uploadedBy   User   @relation(fields: [uploadedById], references: [id])
+
+  createdAt DateTime @default(now())
+
+  currentOf Node? @relation("CurrentVersion")
+
+  @@unique([nodeId, version])
+  @@index([nodeId, createdAt])
+  @@map("file_versions")
+}
+
+model Share {
+  id String @id @default(uuid()) @db.Uuid
+
+  /// Denormalized from the target node so shares can be listed per data room
+  /// without joining the tree.
+  dataRoomId String   @db.Uuid
+  dataRoom   DataRoom @relation(fields: [dataRoomId], references: [id], onDelete: Cascade)
+
+  /// The shared subtree root. A data room share points at the room's root node.
+  nodeId String @db.Uuid
+  node   Node   @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+
+  mode ShareMode
+  role ShareRole @default(VIEWER)
+
+  /// Unguessable id used in the share URL, for both modes: a restricted share
+  /// still needs a link, it just also requires the visitor to be signed in and granted.
+  token String @unique
+
+  createdById String @db.Uuid
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  expiresAt DateTime?
+  revokedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  grants ShareGrant[]
+
+  @@index([dataRoomId, createdAt])
+  @@index([nodeId])
+  @@map("shares")
+}
+
+model ShareGrant {
+  id      String @id @default(uuid()) @db.Uuid
+  shareId String @db.Uuid
+  share   Share  @relation(fields: [shareId], references: [id], onDelete: Cascade)
+
+  /// Lowercased. Invitations are addressed by email so access can be granted
+  /// before the recipient has an account; `userId` is bound on first match.
+  email  String
+  userId String? @db.Uuid
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  role      ShareRole @default(VIEWER)
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([shareId, email])
+  @@index([email])
+  @@index([userId])
+  @@map("share_grants")
+}

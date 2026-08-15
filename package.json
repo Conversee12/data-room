@@ -1,0 +1,32 @@
+{
+  "name": "data-room",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "start": "turbo run start",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md,prisma}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,json,md,prisma}\"",
+    "db:generate": "pnpm --filter @data-room/db generate",
+    "db:migrate": "pnpm --filter @data-room/db migrate",
+    "db:deploy": "pnpm --filter @data-room/db deploy",
+    "db:studio": "pnpm --filter @data-room/db studio"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "prettier-plugin-prisma": "^5.0.0",
+    "turbo": "^2.3.3",
+    "typescript": "^5.7.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@prisma/client", "@prisma/engines", "esbuild", "prisma", "bcrypt"]
+  }
+}
