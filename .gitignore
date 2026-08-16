@@ -20,3 +20,5 @@ Thumbs.db
 .idea/
 packages/db/generated/
 *.tsbuildinfo
+
+.vercel

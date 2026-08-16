@@ -1,0 +1,9 @@
+# Build artefacts and secrets. `apps/api` is deliberately NOT excluded: pnpm
+# installs with a frozen lockfile that covers every workspace, and removing one
+# would make the install fail rather than make it smaller.
+node_modules
+.next
+dist
+.turbo
+packages/db/generated
+.env

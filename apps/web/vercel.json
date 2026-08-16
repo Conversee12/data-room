@@ -1,0 +1,7 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "installCommand": "pnpm install --frozen-lockfile",
+  "//": "The shared package is TypeScript compiled to dist, so it has to be built before Next resolves it.",
+  "buildCommand": "pnpm --filter @data-room/shared build && pnpm --filter @data-room/web build"
+}
