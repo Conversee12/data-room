@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 
+import { ApiIndexController } from './api-index.controller';
 import { AuthGuard } from './auth/auth.guard';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from './config/config.module';
@@ -23,7 +24,7 @@ import { StorageModule } from './storage/storage.module';
     FilesModule,
     SharesModule,
   ],
-  controllers: [HealthController],
+  controllers: [ApiIndexController, HealthController],
   // Authentication is opt-out rather than opt-in: forgetting a decorator locks a
   // route down instead of leaving it open.
   providers: [{ provide: APP_GUARD, useClass: AuthGuard }],

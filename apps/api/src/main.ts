@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import './config/load-dotenv';
 
-import { Logger } from '@nestjs/common';
+import { Logger, RequestMethod } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from './app.module';
@@ -12,7 +12,15 @@ async function bootstrap(): Promise<void> {
   const app = await NestFactory.create(AppModule, { bufferLogs: false });
   const env = app.get<Env>(ENV);
 
-  app.setGlobalPrefix('api');
+  // Everything real lives under /api. The index is excluded from the prefix so
+  // the bare host answers too, instead of returning a blank 404 to anyone who
+  // opens the backend URL in a browser.
+  app.setGlobalPrefix('api', {
+    exclude: [
+      { path: '/', method: RequestMethod.GET },
+      { path: 'api', method: RequestMethod.GET },
+    ],
+  });
   app.useGlobalFilters(new AllExceptionsFilter());
 
   app.enableCors({
