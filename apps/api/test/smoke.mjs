@@ -31,8 +31,19 @@ async function call(path, { method = 'GET', token, shareToken, body } = {}) {
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const text = await res.text();
-  const json = text ? JSON.parse(text) : null;
-  return { status: res.status, body: json };
+
+  // Anything in front of the API — a platform router, a proxy, a cold start —
+  // can answer with plain text. Surfacing that as a failed check beats crashing
+  // the run on a JSON parse error that names neither the status nor the URL.
+  try {
+    return { status: res.status, body: text ? JSON.parse(text) : null };
+  } catch {
+    return {
+      status: res.status,
+      body: null,
+      raw: `${method} ${path} -> ${res.status} ${res.headers.get('content-type') ?? 'no content-type'}: ${text.slice(0, 200)}`,
+    };
+  }
 }
 
 // A minimal but genuinely valid one-page PDF.
@@ -82,8 +93,14 @@ async function uploadPdf({ token, parentId, name, onConflict = 'rename' }) {
 }
 
 const run = async () => {
+  console.log(`Running against ${BASE}\n`);
+
   const health = await call('/health');
-  check('health reports the database up', health.body?.database === 'up', health.body);
+  check(
+    'health reports the database up',
+    health.body?.database === 'up',
+    health.raw ?? health.body,
+  );
 
   // --- accounts -------------------------------------------------------
   const ownerEmail = `owner-${stamp}@example.com`;

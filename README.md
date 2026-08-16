@@ -7,7 +7,7 @@ to anyone with a link.
 | | |
 | --- | --- |
 | **Web** | https://data-room-iota-one.vercel.app |
-| **API** | `<render-url>` — health check at `/api/health` |
+| **API** | https://data-room-api-atry.onrender.com — health check at [`/api/health`](https://data-room-api-atry.onrender.com/api/health) |
 | **Stack** | Next.js · NestJS · PostgreSQL · Prisma · Supabase Storage |
 
 ---
@@ -69,7 +69,7 @@ The web app runs on <http://localhost:3000> and the API on <http://localhost:400
 pnpm --filter @data-room/api smoke
 ```
 
-Fifty-odd assertions against a running API, its real database and real storage —
+Fifty-three assertions against a running API, its real database and real storage —
 including an upload that actually transfers bytes, a folder move that has to drag
 its whole subtree with it, and a share that must reach nested files while
 stopping at the edge of its subtree. Point it elsewhere with
