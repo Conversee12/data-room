@@ -10,6 +10,23 @@ to anyone with a link.
 | **API** | https://data-room-api-atry.onrender.com — health check at [`/api/health`](https://data-room-api-atry.onrender.com/api/health) |
 | **Stack** | Next.js · NestJS · PostgreSQL · Prisma · Supabase Storage |
 
+### Trying it
+
+Sign up with any email, or use an account that already has documents in it:
+
+```text
+demo-owner@example.com
+demo-password-2026
+```
+
+To see sharing from both sides, create a public link on any folder and open it in
+a private window — the same screen renders read-only, with no editing controls
+and with the trail of parent folders hidden.
+
+> The API runs on a free instance that sleeps after fifteen minutes idle, so the
+> first request after a quiet spell takes up to a minute while it wakes. Later
+> requests are normal.
+
 ---
 
 ## What it does
