@@ -6,8 +6,14 @@ export const ILLEGAL_NAME_CHARS = /[\\/:*?"<>|]/;
 
 export const MAX_NAME_LENGTH = 255;
 
-/** Per-file upload ceiling. Enforced when issuing the signed URL and by storage. */
-export const MAX_FILE_BYTES = 100 * 1024 * 1024;
+/**
+ * Per-file upload ceiling. Checked when the signed URL is issued and enforced
+ * again by the storage bucket, so a client that skips the API cannot exceed it.
+ */
+export const MAX_FILE_BYTES = 50 * 1024 * 1024;
+
+/** Human-readable form of the limit, for messages shown next to file pickers. */
+export const MAX_FILE_LABEL = '50 MB';
 
 /** How many files one drag-and-drop batch may contain. */
 export const MAX_UPLOAD_BATCH = 50;

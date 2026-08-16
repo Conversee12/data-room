@@ -4,6 +4,7 @@ import {
   ACCEPTED_MIME_TYPES,
   DEFAULT_PAGE_SIZE,
   MAX_FILE_BYTES,
+  MAX_FILE_LABEL,
   MAX_PAGE_SIZE,
 } from './constants';
 import { checkName, describeNameProblem, normalizeName } from './naming';
@@ -113,7 +114,7 @@ export const uploadIntentSchema = z.object({
     .number()
     .int()
     .positive('The file is empty.')
-    .max(MAX_FILE_BYTES, 'That file is larger than the 100 MB limit.'),
+    .max(MAX_FILE_BYTES, `That file is larger than the ${MAX_FILE_LABEL} limit.`),
   mimeType: z.enum(ACCEPTED_MIME_TYPES, {
     errorMap: () => ({ message: 'Only PDF files can be uploaded.' }),
   }),

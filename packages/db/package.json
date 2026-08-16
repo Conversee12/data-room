@@ -16,14 +16,16 @@
   "scripts": {
     "build": "prisma generate",
     "generate": "prisma generate",
-    "migrate": "prisma migrate dev",
+    "//": "The repository keeps one .env at its root; dotenv-cli points the Prisma CLI at it.",
+    "migrate": "dotenv -e ../../.env -- prisma migrate dev",
     "deploy": "prisma migrate deploy",
-    "studio": "prisma studio"
+    "studio": "dotenv -e ../../.env -- prisma studio"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1"
   },
   "devDependencies": {
+    "dotenv-cli": "^8.0.0",
     "prisma": "^6.2.1"
   }
 }

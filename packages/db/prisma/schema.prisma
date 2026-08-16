@@ -20,8 +20,14 @@ generator client {
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
+  // Migrations need a real session; the transaction pooler cannot run DDL.
   directUrl = env("DIRECT_URL")
 }
+
+// The `pg_trgm` extension the search index depends on is created by the
+// migration that adds that index. Declaring extensions in this block instead
+// would make Prisma track every extension the platform preinstalls and report
+// them all as drift.
 
 enum NodeType {
   FOLDER
@@ -136,10 +142,13 @@ model Node {
   @@unique([parentId, nameKey])
   /// Listing one folder: filter by parent, order folders before files by name.
   @@index([parentId, type, name])
-  /// Subtree prefix scans (stats, cascade delete, share scope).
-  @@index([dataRoomId, path])
-  /// Search by file name across a data room.
-  @@index([dataRoomId, type, nameKey])
+  /// Subtree prefix scans — stats, cascade delete, share scope.
+  /// `text_pattern_ops` is required: under the database's default collation a
+  /// plain btree cannot serve `path LIKE '/a/b/%'`.
+  @@index([dataRoomId, path(ops: raw("text_pattern_ops"))])
+  /// Name search is a substring match, which no btree can answer. A trigram
+  /// index keeps it an index scan as a data room grows.
+  @@index([nameKey(ops: raw("gin_trgm_ops"))], type: Gin)
   @@map("nodes")
 }
 

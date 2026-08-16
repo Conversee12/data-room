@@ -285,10 +285,13 @@ export class NodesRepository {
       }),
     );
 
+    // The `::int` casts are load-bearing: numeric parameters arrive as bigint,
+    // and neither `substring(text, bigint)` nor an int column assignment from
+    // bigint arithmetic exists without them.
     await db.$executeRaw`
       UPDATE "nodes"
-      SET "path" = ${newPath} || SUBSTRING("path" FROM ${node.path.length + 1}),
-          "depth" = "depth" + ${depthDelta},
+      SET "path" = ${newPath} || SUBSTRING("path" FROM ${node.path.length + 1}::int),
+          "depth" = "depth" + ${depthDelta}::int,
           "updatedAt" = NOW()
       WHERE "dataRoomId" = ${node.dataRoomId}::uuid
         AND "path" LIKE ${subtreePattern(node.path)}
